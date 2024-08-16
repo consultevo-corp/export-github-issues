@@ -48,15 +48,11 @@ You can customize the script to include additional fields or modify the format o
 
 If you'd like to contribute to this project, please fork the repository and submit a pull request. We welcome any improvements or bug fixes.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
 For any questions or issues, feel free to open an issue in this repository.
 
 ---
 
-**Author**: [Your Name]  
-**GitHub**: [Your GitHub Profile]
+**Author**: Evrim Aslan
+**GitHub**: https://github.com/evrimaslan85

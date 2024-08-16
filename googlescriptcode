@@ -1,0 +1,133 @@
+function fetchGitHubIssues() {
+  const token = 'token'; // Replace with your GitHub token
+  const org = 'org name'; // Replace with your organization name
+
+  try {
+    const repos = getRepos(token, org);
+    let allIssues = [];
+    
+    repos.forEach(repo => {
+      const repoName = repo.name;
+      const openIssues = getIssuesFromRepo(token, org, repoName, 'open');
+      const closedIssues = getIssuesFromRepo(token, org, repoName, 'closed');
+      const issues = openIssues.concat(closedIssues).map(issue => {
+        const nodeId = issue.node_id;
+        const issueDetails = getIssueDetailsFromGraphQL(token, nodeId);
+        return {
+          repo_name: repoName,
+          title: issue.title,
+          node_id: nodeId,
+          open_date: issue.created_at,
+          close_date: issue.closed_at || '',
+          assignee: issue.assignee ? issue.assignee.login : 'Unassigned',
+          link: issue.html_url,
+          body: issue.body || '',
+          details: issueDetails
+        };
+      });
+      allIssues = allIssues.concat(issues);
+    });
+
+    // Output to specific Google Sheet and sheet
+    const spreadsheetId = 'spreadsheet id'; // Replace with your spreadsheet ID
+    const sheetName = 'sheet name'; // Replace with your sheet name
+    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+    
+    if (!sheet) {
+      throw new Error(`Sheet with name ${sheetName} not found in spreadsheet ${spreadsheetId}`);
+    }
+
+    sheet.clear();
+    sheet.appendRow(['Repo Name', 'Issue Title', 'Node ID', 'Open Date', 'Close Date', 'Assignee', 'Issue Link', 'Body', 'Details']);
+    allIssues.forEach(data => {
+      sheet.appendRow([data.repo_name, data.title, data.node_id, data.open_date, data.close_date, data.assignee, data.link, data.body, JSON.stringify(data.details)]);
+    });
+  } catch (e) {
+    Logger.log(e.toString());
+  }
+}
+
+function getRepos(token, org) {
+  const url = `https://api.github.com/orgs/${org}/repos`;
+  Logger.log(`Fetching repos from URL: ${url}`);
+  
+  const options = {
+    method: 'get',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json'
+    },
+    muteHttpExceptions: true
+  };
+  
+  const response = UrlFetchApp.fetch(url, options);
+  Logger.log(`Response code: ${response.getResponseCode()}`);
+  Logger.log(`Response content: ${response.getContentText()}`);
+  
+  if (response.getResponseCode() !== 200) {
+    throw new Error(`Error fetching repos: ${response.getContentText()}`);
+  }
+  
+  return JSON.parse(response.getContentText());
+}
+
+function getIssuesFromRepo(token, owner, repo, state) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/issues?state=${state}`;
+  Logger.log(`Fetching ${state} issues from URL: ${url}`);
+  
+  const options = {
+    method: 'get',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json'
+    },
+    muteHttpExceptions: true
+  };
+  
+  const response = UrlFetchApp.fetch(url, options);
+  Logger.log(`Response code: ${response.getResponseCode()}`);
+  Logger.log(`Response content: ${response.getContentText()}`);
+  
+  if (response.getResponseCode() !== 200) {
+    throw new Error(`Error fetching ${state} issues: ${response.getContentText()}`);
+  }
+  
+  return JSON.parse(response.getContentText());
+}
+
+function getIssueDetailsFromGraphQL(token, nodeId) {
+  const url = 'https://api.github.com/graphql';
+  const query = `
+    query {
+      node(id: "${nodeId}") {
+        ... on Issue {
+          title
+          body
+          createdAt
+          updatedAt
+        }
+      }
+    }
+  `;
+  
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json'
+    },
+    payload: JSON.stringify({ query }),
+    muteHttpExceptions: true
+  };
+  
+  const response = UrlFetchApp.fetch(url, options);
+  Logger.log(`GraphQL response code: ${response.getResponseCode()}`);
+  Logger.log(`GraphQL response content: ${response.getContentText()}`);
+  
+  if (response.getResponseCode() !== 200) {
+    throw new Error(`Error fetching issue details: ${response.getContentText()}`);
+  }
+  
+  return JSON.parse(response.getContentText());
+}
